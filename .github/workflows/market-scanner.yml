@@ -1,0 +1,35 @@
+name: Autonomous Market Scanner
+
+on:
+  schedule:
+    - cron: '55 19 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  scan-market:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Run Market Scanner
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/market_scanner.py
+
+      - name: Commit and push categories.json
+        run: |
+          git config --global user.name "Market Scanner Bot"
+          git config --global user.email "bot@etflens.com"
+          git add categories.json
+          git commit -m "Auto-update categories.json with latest market trends" || echo "No changes to commit"
+          git push
