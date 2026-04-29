@@ -72,21 +72,33 @@ def fetch_gemini():
 
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
     
-    try:
-        print(f"Requesting generateContent from {target_model}...")
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode('utf-8')
-            res_json = json.loads(res_body)
-            raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
-            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8')
-        print(f"Model {target_model} failed with HTTP {e.code}: {err_body}")
-        return None
-    except Exception as e:
-        print(f"Model {target_model} failed with Error: {e}")
-        return None
+    max_retries = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"Requesting generateContent from {target_model} (Attempt {attempt}/{max_retries})...")
+            with urllib.request.urlopen(req) as response:
+                res_body = response.read().decode('utf-8')
+                res_json = json.loads(res_body)
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_text)
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8')
+            print(f"Model {target_model} failed with HTTP {e.code}: {err_body}")
+            if e.code in [503, 429] and attempt < max_retries:
+                print(f"Server busy or rate limited. Waiting 10 seconds before retry...")
+                time.sleep(10)
+                continue
+            return None
+        except Exception as e:
+            print(f"Model {target_model} failed with Error: {e}")
+            if attempt < max_retries:
+                print(f"Unexpected error. Waiting 10 seconds before retry...")
+                time.sleep(10)
+                continue
+            return None
+            
+    return None
 
 if __name__ == "__main__":
     print("Starting Autonomous Market Scanner...")
