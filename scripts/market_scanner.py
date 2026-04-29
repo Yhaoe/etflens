@@ -4,7 +4,7 @@ import urllib.request
 import time
 
 def fetch_gemini():
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         print("Error: GEMINI_API_KEY environment variable not set.")
         return None
@@ -28,28 +28,40 @@ def fetch_gemini():
     Make sure to provide exactly 10 realistic ETFs per category. Be precise with typical Expense Ratios (er) and Beta.
     """
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
-    data = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            "response_mime_type": "application/json"
-        }
-    }).encode('utf-8')
+    models_to_try = [
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-pro"
+    ]
 
-    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-    
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode('utf-8')
-            res_json = json.loads(res_body)
-            raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
-            # Clean possible markdown block
-            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-    except Exception as e:
-        print(f"Failed to fetch from Gemini: {e}")
-        return None
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        data = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.2,
+                "response_mime_type": "application/json"
+            }
+        }).encode('utf-8')
+
+        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        try:
+            print(f"Trying model: {model_name}...")
+            with urllib.request.urlopen(req) as response:
+                res_body = response.read().decode('utf-8')
+                res_json = json.loads(res_body)
+                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean_text)
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8')
+            print(f"Model {model_name} failed with HTTP {e.code}: {err_body}")
+        except Exception as e:
+            print(f"Model {model_name} failed with Error: {e}")
+
+    print("All fallback models failed.")
+    return None
 
 if __name__ == "__main__":
     print("Starting Autonomous Market Scanner...")
