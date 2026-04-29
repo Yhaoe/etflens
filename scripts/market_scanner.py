@@ -72,7 +72,7 @@ def fetch_gemini():
 
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
     
-    max_retries = 5
+    max_retries = 12
     for attempt in range(1, max_retries + 1):
         try:
             print(f"Requesting generateContent from {target_model} (Attempt {attempt}/{max_retries})...")
@@ -86,15 +86,15 @@ def fetch_gemini():
             err_body = e.read().decode('utf-8')
             print(f"Model {target_model} failed with HTTP {e.code}: {err_body}")
             if e.code in [503, 429] and attempt < max_retries:
-                print(f"Server busy or rate limited. Waiting 10 seconds before retry...")
-                time.sleep(10)
+                print(f"Server busy or rate limited. Waiting 5 minutes before retry...")
+                time.sleep(300)
                 continue
             return None
         except Exception as e:
             print(f"Model {target_model} failed with Error: {e}")
             if attempt < max_retries:
-                print(f"Unexpected error. Waiting 10 seconds before retry...")
-                time.sleep(10)
+                print(f"Unexpected error. Waiting 5 minutes before retry...")
+                time.sleep(300)
                 continue
             return None
             
