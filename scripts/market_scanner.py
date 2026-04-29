@@ -9,6 +9,39 @@ def fetch_gemini():
         print("Error: GEMINI_API_KEY environment variable not set.")
         return None
 
+    # Dynamically fetch available models to avoid 404 errors
+    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    target_model = None
+    try:
+        req_list = urllib.request.Request(list_url)
+        with urllib.request.urlopen(req_list) as response:
+            res_body = response.read().decode('utf-8')
+            models_data = json.loads(res_body)
+            
+            available_models = []
+            for m in models_data.get('models', []):
+                if 'generateContent' in m.get('supportedGenerationMethods', []):
+                    name = m['name'].split('/')[-1]
+                    available_models.append(name)
+            
+            if not available_models:
+                print("Error: No models found that support generateContent.")
+                return None
+                
+            # Try to pick a flash model first
+            for name in available_models:
+                if 'flash' in name.lower():
+                    target_model = name
+                    break
+            
+            if not target_model:
+                target_model = available_models[0]
+                
+            print(f"Dynamically selected model: {target_model} from {len(available_models)} available models.")
+    except Exception as e:
+        print(f"Failed to list models: {e}")
+        return None
+
     prompt = """
     You are a professional quantitative financial analyst.
     Your task is to generate a JSON array containing the top 10 ETFs for exactly 10 categories right now in the US Market.
@@ -28,40 +61,32 @@ def fetch_gemini():
     Make sure to provide exactly 10 realistic ETFs per category. Be precise with typical Expense Ratios (er) and Beta.
     """
 
-    models_to_try = [
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
-        "gemini-pro"
-    ]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
+    data = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "response_mime_type": "application/json"
+        }
+    }).encode('utf-8')
 
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        data = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-                "response_mime_type": "application/json"
-            }
-        }).encode('utf-8')
-
-        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-        
-        try:
-            print(f"Trying model: {model_name}...")
-            with urllib.request.urlopen(req) as response:
-                res_body = response.read().decode('utf-8')
-                res_json = json.loads(res_body)
-                raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
-                clean_text = raw_text.replace("```json", "").replace("```", "").strip()
-                return json.loads(clean_text)
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode('utf-8')
-            print(f"Model {model_name} failed with HTTP {e.code}: {err_body}")
-        except Exception as e:
-            print(f"Model {model_name} failed with Error: {e}")
-
-    print("All fallback models failed.")
-    return None
+    req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
+    
+    try:
+        print(f"Requesting generateContent from {target_model}...")
+        with urllib.request.urlopen(req) as response:
+            res_body = response.read().decode('utf-8')
+            res_json = json.loads(res_body)
+            raw_text = res_json['candidates'][0]['content']['parts'][0]['text']
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_text)
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8')
+        print(f"Model {target_model} failed with HTTP {e.code}: {err_body}")
+        return None
+    except Exception as e:
+        print(f"Model {target_model} failed with Error: {e}")
+        return None
 
 if __name__ == "__main__":
     print("Starting Autonomous Market Scanner...")
