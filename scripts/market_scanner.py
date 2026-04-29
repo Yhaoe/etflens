@@ -28,7 +28,7 @@ def fetch_gemini():
     Make sure to provide exactly 10 realistic ETFs per category. Be precise with typical Expense Ratios (er) and Beta.
     """
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
     data = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
