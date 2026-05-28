@@ -26,12 +26,12 @@ jobs:
         run: |
           python scripts/market_scanner.py
 
-           - name: Commit and push categories.json
+      - name: Commit and push categories.json
         run: |
           git config --global user.name "Market Scanner Bot"
           git config --global user.email "bot@etflens.com"
           git add categories.json
           git commit -m "Auto-update categories.json with latest market trends" || echo "No changes to commit"
           git fetch origin main
-          git rebase origin/main
-          git push
+          git pull --rebase origin main
+          git push origin main
